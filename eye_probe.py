@@ -7,6 +7,7 @@ from matplotlib.backends.backend_wxagg import FigureCanvasWxAgg as FigureCanvas
 from matplotlib.backends.backend_wx import NavigationToolbar2Wx
 from matplotlib.figure import Figure
 from matplotlib.widgets import Slider
+from scipy.signal import resample
 from eye_core import calc_eye_heatmap,get_demo_data,seg_map_scope
 from wx.lib.intctrl import IntCtrl
 import wx.lib.agw.floatspin as FS
@@ -35,12 +36,20 @@ class MyFrame(wx.Frame):
 
         self.int_npui = IntCtrl(panel,-1,32,min=1,max=99999,limited=True,size=(50,-1))
 
+
         self.fs_datarate = FS.FloatSpin(panel, -1,size=(65,-1), min_val=0, max_val=9999,
                                        increment=0.1, value=10, agwStyle=FS.FS_LEFT)
 
         self.fs_datarate.SetFormat("%G")
         self.fs_datarate.SetDigits(5)
 
+
+
+        self.cb_sinc_interp_n = wx.ComboBox(panel, -1,"Off", (-1, -1), 
+                         (-1, -1), ["Off","2pts","4pts","8pts","16pts"],
+                         wx.CB_DROPDOWN
+                         |wx.CB_READONLY
+                         )
 
         self.cb_colorbar_en= wx.CheckBox(panel,-1,"Enable Colorbar")
 
@@ -66,24 +75,28 @@ class MyFrame(wx.Frame):
 
 
         sizer = wx.BoxSizer(wx.HORIZONTAL)
-        sizer_left = wx.GridBagSizer(hgap=5, vgap=5)
+        sizer_left = wx.GridBagSizer(hgap=5, vgap=10)
         sizer_left.Add(self.fbb_waveform_path,pos=(0,0),span=(1,3),flag=wx.ALIGN_CENTER_VERTICAL)
 
 
-        sizer_left.Add(wx.StaticText(panel,-1,"samps_per_ui"),pos=(1,0),flag=wx.ALIGN_CENTER_VERTICAL)
+        sizer_left.Add(wx.StaticText(panel,-1,"Samples per UI"),pos=(1,0),flag=wx.ALIGN_CENTER_VERTICAL)
         sizer_left.Add(self.int_npui,pos=(1,1),flag=wx.ALIGN_CENTER_VERTICAL)
 
         sizer_left.Add(wx.StaticText(panel,-1,"Data Rate"),pos=(2,0),flag=wx.ALIGN_CENTER_VERTICAL)
         sizer_left.Add(self.fs_datarate,pos=(2,1),flag=wx.ALIGN_CENTER_VERTICAL)
         sizer_left.Add(wx.StaticText(panel,-1,"Gbps"),pos=(2,2),flag=wx.ALIGN_CENTER_VERTICAL)
 
-        sizer_left.Add(self.cb_colorbar_en,pos=(3,0),span=(1,3),flag=wx.ALIGN_CENTER_VERTICAL)
-        sizer_left.Add(self.cb_mask_en,pos=(4,0),span=(1,3),flag=wx.ALIGN_CENTER_VERTICAL)
+        sizer_left.Add(wx.StaticText(panel,-1,"Sin(x)/x Interp"),pos=(3,0),flag=wx.ALIGN_CENTER_VERTICAL)
+        sizer_left.Add(self.cb_sinc_interp_n,pos=(3,1),flag=wx.ALIGN_CENTER_VERTICAL)
 
-        sizer_left.Add(self.fbb_mask_path,pos=(5,0),span=(1,3),flag=wx.ALIGN_CENTER_VERTICAL)
-        sizer_left.Add(self.sld_maskadj,pos=(6,0),span=(1,3),flag=wx.ALIGN_CENTER_VERTICAL)
+
+        sizer_left.Add(self.cb_colorbar_en,pos=(4,0),span=(1,3),flag=wx.ALIGN_CENTER_VERTICAL)
+        sizer_left.Add(self.cb_mask_en,pos=(5,0),span=(1,3),flag=wx.ALIGN_CENTER_VERTICAL)
+
+        sizer_left.Add(self.fbb_mask_path,pos=(6,0),span=(1,3),flag=wx.ALIGN_CENTER_VERTICAL)
+        sizer_left.Add(self.sld_maskadj,pos=(7,0),span=(1,3),flag=wx.ALIGN_CENTER_VERTICAL)
         
-        sizer_left.Add(self.btn_plot,pos=(7,0),span=(1,3),flag=wx.ALIGN_CENTER_VERTICAL)
+        sizer_left.Add(self.btn_plot,pos=(8,0),span=(1,3),flag=wx.ALIGN_CENTER_VERTICAL)
 
 
         sizer_right = wx.BoxSizer(wx.VERTICAL)
@@ -112,21 +125,32 @@ class MyFrame(wx.Frame):
         sig_file = self.fbb_waveform_path.GetValue()
         samps_per_ui = self.int_npui.GetValue()
         data_rate = self.fs_datarate.GetValue()
+        sinc_interp_str = self.cb_sinc_interp_n.GetValue()
+        if sinc_interp_str == "Off":
+            sinc_interp_n = 0
+        else:
+            sinc_interp_n = int(sinc_interp_str[:-3])
+
         colorbar_en = self.cb_colorbar_en.GetValue()
         mask_en = self.cb_mask_en.GetValue()
         mask_path = self.fbb_mask_path.GetValue()
 
         return (sig_file,samps_per_ui,data_rate,
-                colorbar_en,mask_en,mask_path)
+                sinc_interp_n,colorbar_en,mask_en,
+                mask_path)
 
 
 
     def OnPlot(self,evt):
         print (self._get_conf())
         print("plot")
-        sig_file,samps_per_ui,data_rate,\
+        sig_file,samps_per_ui,data_rate,sinc_interp_n,\
         colorbar_en,mask_en,mask_path = self._get_conf()
         sig = np.loadtxt(sig_file)
+        if sinc_interp_n>0: 
+            sig = resample(sig,len(sig)*sinc_interp_n)
+            samps_per_ui *= sinc_interp_n
+
         ui = 1e-9/data_rate
         if mask_en:
             eye_mask = self.get_mask(norm_mask1,ui*1e12)
