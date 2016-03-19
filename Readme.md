@@ -9,4 +9,4 @@ It now just a prototype, with the feature:
 
 More functions will be added later.
 
-![](screenshot\main_gui.png)
+![](https://github.com/leeooox/eye_probe/raw/master/screenshot/main_gui.png)
