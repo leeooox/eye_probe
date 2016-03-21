@@ -13,8 +13,7 @@ from wx.lib.intctrl import IntCtrl
 import wx.lib.agw.floatspin as FS
 import wx.lib.filebrowsebutton as filebrowse
 scope_cmap = mpl.colors.LinearSegmentedColormap("scope_cmap",seg_map_scope,N=4096)
-norm_mask1 = np.array( [[0.315,0.5], [0.50,0.53], [0.685,0.5], [0.5,0.47]])
-
+#norm_mask1 = np.array( [[0.315,0.5], [0.50,0.53], [0.685,0.5], [0.5,0.47]])
 
 
 
@@ -60,6 +59,8 @@ class MyFrame(wx.Frame):
 
         self.fbb_mask_path = filebrowse.FileBrowseButton(
             panel, -1, size=(300, -1), labelText="Mask")
+        self.fbb_mask_path.Enable(False)
+        self.sld_maskadj.Enable(False)
 
         self.btn_plot = wx.Button(panel,-1,"Plot Eye")
 
@@ -115,6 +116,7 @@ class MyFrame(wx.Frame):
 
         self.btn_plot.Bind(wx.EVT_BUTTON, self.OnPlot)
         self.sld_maskadj.Bind(wx.EVT_SCROLL_CHANGED, self.OnAdjustMask)
+        self.cb_mask_en.Bind(wx.EVT_CHECKBOX, self.OnEnableEyeMask)
 
         #sig,samps_per_ui,ui = get_demo_data() 
 
@@ -153,7 +155,11 @@ class MyFrame(wx.Frame):
 
         ui = 1e-9/data_rate
         if mask_en:
-            eye_mask = self.get_mask(norm_mask1,ui*1e12)
+            if mask_path:
+                norm_mask1 = np.loadtxt(mask_path,delimiter=",")
+                eye_mask = self.get_mask(norm_mask1,ui*1e12)
+            else:
+                eye_mask = None # should print some errors
         else:
             eye_mask = None
 
@@ -167,6 +173,13 @@ class MyFrame(wx.Frame):
         self.mask_poly.set_xy(mask_temp)
         self.canvas.draw_idle()
         
+    def OnEnableEyeMask(self,evt):
+        mask_en = evt.EventObject.GetValue()
+        self.fbb_mask_path.Enable(mask_en)
+        self.sld_maskadj.Enable(mask_en)
+
+
+
     def get_mask(self,norm_mask,ui,vhigh=1,vlow=-1):
         mask = norm_mask.copy()
         mask[:,0]-=0.5
@@ -187,7 +200,7 @@ class MyFrame(wx.Frame):
         #    mask_poly.set_xy(mask_temp)
         #    self.canvas.draw_idle()
         
-        self.axes1.cla()
+        self.figure.clf()
         
         self.axes1 = self.figure.add_subplot(1,1,1)
         self.eye_mask_en = False if eye_mask == None else True
