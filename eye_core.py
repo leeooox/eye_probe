@@ -41,7 +41,7 @@ seg_map_scope = dict(
 
 
 
-def calc_eye_heatmap(sig, samps_per_ui, ui, grid_size=(800,640)):#, ui, clock_times=None):
+def calc_eye_heatmap(sig, samps_per_ui, ui ,clock_times=None, grid_size=(800,640)):
     height, width = grid_size
 
     dt = width / (samps_per_ui*2)
@@ -56,21 +56,37 @@ def calc_eye_heatmap(sig, samps_per_ui, ui, grid_size=(800,640)):#, ui, clock_ti
     sig_min -= 0.05*sig_amp
     sig_max += 0.05*sig_amp
 
-    start_ix      = np.where(np.diff(np.sign(sig)))[0][0] + samps_per_ui // 2 
-    last_start_ix = len(sig) - 2 * samps_per_ui
-
-
-
     xs = np.linspace(-ui * 1.e12, ui * 1.e12, width)
     ys = np.linspace(sig_min, sig_max, height)
 
-    
-    xx = np.arange(2*samps_per_ui+1)*dt 
-    while(start_ix < last_start_ix):
-        yy = sig[start_ix : start_ix + 2 * samps_per_ui+1]
-        iyd = (height * (yy - sig_min)/(sig_max - sig_min)+0.5).astype(np.int32)    
-        bres_curve_count(xx.astype(np.int32), iyd, counts)
-        start_ix += samps_per_ui
+    xx = (np.arange(2*samps_per_ui+1)*dt).astype(np.int32)
+    if clock_times is not None:
+        tsamp = ui / samps_per_ui
+
+        for clock_time in clock_times:
+            start_time = clock_time - ui
+            stop_time  = clock_time + ui
+            start_ix   = int(start_time // tsamp)
+            if(start_ix + 2 * samps_per_ui + 1 > len(sig)):
+                break
+            elif start_ix <0:
+                continue
+
+            interp_fac = (start_time - start_ix * tsamp) / tsamp
+            samp1 = sig[start_ix : start_ix + 2 * samps_per_ui+1]
+            samp2 = sig[start_ix + 1 : start_ix + 2 + 2 * samps_per_ui]
+            yy = samp1 + (samp2 - samp1) * interp_fac
+            iyd = (height * (yy - sig_min)/(sig_max - sig_min)+0.5).astype(np.int32)
+            bres_curve_count(xx, iyd, counts)     
+
+    else:
+        start_ix      = np.where(np.diff(np.sign(sig)))[0][0] + samps_per_ui // 2 
+        last_start_ix = len(sig) - 2 * samps_per_ui
+        while(start_ix < last_start_ix):
+            yy = sig[start_ix : start_ix + 2 * samps_per_ui+1]
+            iyd = (height * (yy - sig_min)/(sig_max - sig_min)+0.5).astype(np.int32)    
+            bres_curve_count(xx, iyd, counts)
+            start_ix += samps_per_ui
 
     return xs,ys,counts.T
 

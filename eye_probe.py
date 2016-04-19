@@ -50,6 +50,20 @@ class MyFrame(wx.Frame):
                          |wx.CB_READONLY
                          )
 
+        self.cb_CRU =  wx.ComboBox(panel, -1,"Constant clock", (-1, -1), 
+                         (-1, -1), ["Constant clock","Clock times file"],
+                         wx.CB_DROPDOWN
+                         |wx.CB_READONLY
+                         )
+
+        self.fbb_clock_time_file = filebrowse.FileBrowseButton(
+            panel, -1, size=(300, -1), labelText="Clock times")
+
+        self.fbb_clock_time_file.Enable(False)
+
+        self.int_ignor_cycles = IntCtrl(panel,-1,0,min=0,max=9999999,limited=True,size=(50,-1))
+        self.int_ignor_cycles.Enable(False)
+
         self.cb_colorbar_en= wx.CheckBox(panel,-1,"Enable Colorbar")
 
         self.cb_mask_en= wx.CheckBox(panel,-1,"Enable Mask")
@@ -90,14 +104,20 @@ class MyFrame(wx.Frame):
         sizer_left.Add(wx.StaticText(panel,-1,"Sin(x)/x Interp"),pos=(3,0),flag=wx.ALIGN_CENTER_VERTICAL)
         sizer_left.Add(self.cb_sinc_interp_n,pos=(3,1),flag=wx.ALIGN_CENTER_VERTICAL)
 
+        sizer_left.Add(wx.StaticText(panel,-1,"Clock Recovery"),pos=(4,0),flag=wx.ALIGN_CENTER_VERTICAL)
+        sizer_left.Add(self.cb_CRU,pos=(4,1),span=(1,2),flag=wx.ALIGN_CENTER_VERTICAL)
 
-        sizer_left.Add(self.cb_colorbar_en,pos=(4,0),span=(1,3),flag=wx.ALIGN_CENTER_VERTICAL)
-        sizer_left.Add(self.cb_mask_en,pos=(5,0),span=(1,3),flag=wx.ALIGN_CENTER_VERTICAL)
+        sizer_left.Add(self.fbb_clock_time_file,pos=(5,0),span=(1,3),flag=wx.ALIGN_CENTER_VERTICAL)
+        sizer_left.Add(wx.StaticText(panel,-1,"Ignore cycles"),pos=(6,0),flag=wx.ALIGN_CENTER_VERTICAL)
+        sizer_left.Add(self.int_ignor_cycles,pos=(6,1),flag=wx.ALIGN_CENTER_VERTICAL)
 
-        sizer_left.Add(self.fbb_mask_path,pos=(6,0),span=(1,3),flag=wx.ALIGN_CENTER_VERTICAL)
-        sizer_left.Add(self.sld_maskadj,pos=(7,0),span=(1,3),flag=wx.ALIGN_CENTER_VERTICAL)
+        sizer_left.Add(self.cb_colorbar_en,pos=(7,0),span=(1,3),flag=wx.ALIGN_CENTER_VERTICAL)
+        sizer_left.Add(self.cb_mask_en,pos=(8,0),span=(1,3),flag=wx.ALIGN_CENTER_VERTICAL)
+
+        sizer_left.Add(self.fbb_mask_path,pos=(9,0),span=(1,3),flag=wx.ALIGN_CENTER_VERTICAL)
+        sizer_left.Add(self.sld_maskadj,pos=(10,0),span=(1,3),flag=wx.ALIGN_CENTER_VERTICAL)
         
-        sizer_left.Add(self.btn_plot,pos=(8,0),span=(1,3),flag=wx.ALIGN_CENTER_VERTICAL)
+        sizer_left.Add(self.btn_plot,pos=(11,0),span=(1,3),flag=wx.ALIGN_CENTER_VERTICAL)
 
 
         sizer_right = wx.BoxSizer(wx.VERTICAL)
@@ -117,6 +137,7 @@ class MyFrame(wx.Frame):
         self.btn_plot.Bind(wx.EVT_BUTTON, self.OnPlot)
         self.sld_maskadj.Bind(wx.EVT_SCROLL_CHANGED, self.OnAdjustMask)
         self.cb_mask_en.Bind(wx.EVT_CHECKBOX, self.OnEnableEyeMask)
+        self.cb_CRU.Bind(wx.EVT_COMBOBOX, self.OnChangeCRU)
 
         #sig,samps_per_ui,ui = get_demo_data() 
 
@@ -132,23 +153,47 @@ class MyFrame(wx.Frame):
             sinc_interp_n = 0
         else:
             sinc_interp_n = int(sinc_interp_str[:-3])
+    
+        CRU_str = self.cb_CRU.GetValue()
+        if CRU_str == "Clock times file":
+            clock_times_file = self.fbb_clock_time_file.GetValue()
+        else:
+            clock_times_file = None
+
+        ignor_cycles = self.int_ignor_cycles.GetValue()
 
         colorbar_en = self.cb_colorbar_en.GetValue()
         mask_en = self.cb_mask_en.GetValue()
         mask_path = self.fbb_mask_path.GetValue()
 
         return (sig_file,samps_per_ui,data_rate,
-                sinc_interp_n,colorbar_en,mask_en,
+                sinc_interp_n,clock_times_file,
+                ignor_cycles,colorbar_en,mask_en,
                 mask_path)
 
+    def OnChangeCRU(self,evt):
+        CRU_str = evt.GetEventObject().GetValue()
+
+        if CRU_str == "Clock times file":
+            self.fbb_clock_time_file.Enable(True)
+            self.int_ignor_cycles.Enable(True)
+        else:
+            self.fbb_clock_time_file.Enable(False)
+            self.int_ignor_cycles.Enable(False)
 
 
     def OnPlot(self,evt):
-        print (self._get_conf())
-        print("plot")
+        #print (self._get_conf())
+        #print("plot")
         sig_file,samps_per_ui,data_rate,sinc_interp_n,\
-        colorbar_en,mask_en,mask_path = self._get_conf()
+        clock_times_file,ignor_cycles,colorbar_en,\
+        mask_en,mask_path = self._get_conf()
         sig = np.loadtxt(sig_file)
+        if clock_times_file is not None:
+            clock_times = np.loadtxt(clock_times_file)[ignor_cycles:]
+        else:
+            clock_times = None
+        #print(len(sig))
         if sinc_interp_n>0: 
             sig = resample(sig,len(sig)*sinc_interp_n)
             samps_per_ui *= sinc_interp_n
@@ -163,8 +208,8 @@ class MyFrame(wx.Frame):
         else:
             eye_mask = None
 
-        self.plot_eye(sig,samps_per_ui,ui,colorbar_en,
-                eye_mask)
+        self.plot_eye(sig,samps_per_ui,ui,clock_times,
+                colorbar_en,eye_mask)
 
     def OnAdjustMask(self,evt):
         val = evt.EventObject.GetValue()
@@ -190,8 +235,8 @@ class MyFrame(wx.Frame):
 
 
 
-    def plot_eye(self,sig, samps_per_ui, ui, colorbar_en=False,
-            eye_mask=None,grid_size=(640,480)):
+    def plot_eye(self,sig, samps_per_ui, ui, clock_times=None,
+            colorbar_en=False,eye_mask=None,grid_size=(640,480)):
         
         #def update_mask(val):
             #print(val)
@@ -204,7 +249,7 @@ class MyFrame(wx.Frame):
         
         self.axes1 = self.figure.add_subplot(1,1,1)
         self.eye_mask_en = False if eye_mask == None else True
-        xs,ys,eye_heat = calc_eye_heatmap(sig, samps_per_ui, ui,grid_size) 
+        xs,ys,eye_heat = calc_eye_heatmap(sig, samps_per_ui, ui, clock_times, grid_size) 
         im = self.axes1.pcolormesh(xs,ys,eye_heat,cmap=scope_cmap,
                 shading="gouraud")
 
