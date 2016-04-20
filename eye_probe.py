@@ -236,7 +236,7 @@ class MyFrame(wx.Frame):
 
 
     def plot_eye(self,sig, samps_per_ui, ui, clock_times=None,
-            colorbar_en=False,eye_mask=None,grid_size=(640,480)):
+            colorbar_en=False,eye_mask=None,grid_size=(480,640)):
         
         #def update_mask(val):
             #print(val)
