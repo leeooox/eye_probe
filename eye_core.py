@@ -75,7 +75,6 @@ def calc_eye_heatmap(sig, samps_per_ui, ui ,clock_times=None, grid_size=(800,640
             interp_fac = (start_time - start_ix * tsamp) / tsamp
             samp1 = sig[start_ix : start_ix + 2 * samps_per_ui+1]
             samp2 = sig[start_ix + 1 : start_ix + 2 + 2 * samps_per_ui]
-            print (len(samp1),len(samp2),start_ix + 1,start_ix + 2 + 2 * samps_per_ui)
             yy = samp1 + (samp2 - samp1) * interp_fac
             iyd = (height * (yy - sig_min)/(sig_max - sig_min)+0.5).astype(np.int32)
             bres_curve_count(xx, iyd, counts)     
